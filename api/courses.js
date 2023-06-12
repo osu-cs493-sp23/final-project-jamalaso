@@ -1,7 +1,7 @@
 const { Router } = require('express')
 
 const router = Router()
-const { getAllCourses, insertCourse, getCourseById, updateCourse, deleteCourse} = require('../models/courses');
+const { getAllCourses, insertCourse, getCourseById, updateCourse, deleteCourse, getAssignmentsByCourse} = require('../models/courses');
 const { ObjectId } = require('mongodb');
 
 
@@ -123,11 +123,21 @@ router.get('/:id/roster', async function (req, res, next) {
     });
 })
 
+
+
+
 router.get('/:id/assignments', async function (req, res, next) {
+  try {
+    const courseId = req.params.id;
+    const assignments = await getAssignmentsByCourse(courseId);
+
     res.status(200).json({
-        message: 'GET /courses/{id}/assignments'
+      assignments: assignments
     });
-})
+  } catch (err) {
+    next(err);
+  }
+});
 
 
 

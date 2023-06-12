@@ -1,7 +1,8 @@
 const { Router } = require('express')
 
 const router = Router()
-const { getAllAssignments, insertAssignment, getAssignmentById, updateAssignment, deleteAssignment} = require('../models/assignments');
+const { getAllAssignments, insertAssignment, getAssignmentById, updateAssignment, deleteAssignment,
+  getSubmissions, addSubmission} = require('../models/assignments');
 const { ObjectId } = require('mongodb');
 
 
@@ -98,18 +99,41 @@ router.delete('/:id', async function (req, res, next) {
 
 
 
-
 router.get('/:id/submissions', async function (req, res, next) {
-    res.status(200).json({
-        message: 'GET /assignments/{id}/submissions'
-    });
-})
+    try {
+      const assignmentId = req.params.id;
+  
+      const submissions = await getSubmissions(assignmentId);
+  
+      res.status(200).json({
+        submissions: submissions
+      });
+    } catch (err) {
+      next(err);
+    }
+  });
 
-router.post('/:id/submissions', async function (req, res, next) {
-    res.status(200).json({
-        message: 'POST /assignments/{id}/submissions'
-    });
-})
+
+  router.post('/:id/submissions', async function (req, res, next) {
+    try {
+      const assignmentId = req.params.id;
+      const newSubmission = {
+        assignmentId: assignmentId,
+        studentId: req.body.studentId,
+        timestamp: req.body.timestamp,
+        grade: req.body.grade,
+        file: req.body.file
+      };
+  
+      const insertedId = await addSubmission(newSubmission);
+  
+      res.status(200).json({
+        insertedId: insertedId
+      });
+    } catch (err) {
+      next(err);
+    }
+  });
 
 
 

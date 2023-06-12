@@ -61,3 +61,14 @@ async function deleteCourse(courseId) {
 }
 exports.deleteCourse = deleteCourse;
 
+
+
+async function getAssignmentsByCourse(courseId) {
+    const db = getDbReference();
+    const collection = db.collection('assignments');
+  
+    const assignments = await collection.find({ courseId: courseId }).toArray();
+  
+    return assignments;
+}
+exports.getAssignmentsByCourse = getAssignmentsByCourse;

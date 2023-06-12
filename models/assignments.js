@@ -3,7 +3,7 @@ const { ObjectId } = require('mongodb');
 
 
 const AssignmentsSchema = {
-    courseId: { type: Number, required: true },
+    courseId: { type: String, required: true },
     title: { type: String, required: true },
     points: { type: Number, required: true },
     due: { type: Date, required: true }
@@ -59,3 +59,26 @@ async function deleteAssignment(assignmentId) {
     return result.deletedCount;
 }
 exports.deleteAssignment = deleteAssignment;
+
+
+async function getSubmissions(assignmentId) {
+    const db = getDbReference();
+    const collection = db.collection('submissions');
+  
+    const submissions = await collection.find({ assignmentId: assignmentId }).toArray();
+  
+    return submissions;
+}
+exports.getSubmissions = getSubmissions;
+
+
+async function addSubmission(submission) {
+    const db = getDbReference();
+    const collection = db.collection('submissions');
+    const result = await collection.insertOne(submission);
+  
+    return result.insertedId;
+}
+exports.addSubmission = addSubmission;
+
+
