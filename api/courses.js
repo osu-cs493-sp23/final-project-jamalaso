@@ -1,7 +1,8 @@
 const { Router } = require('express')
 
 const router = Router()
-const { getAllCourses, insertCourse, getCourseById, updateCourse, deleteCourse, getAssignmentsByCourse} = require('../models/courses');
+const { getAllCourses, insertCourse, getCourseById, updateCourse, deleteCourse, 
+  getAssignmentsByCourse, getCourseStudents, addEnrolledStudents, getCourseRoster} = require('../models/courses');
 const { ObjectId } = require('mongodb');
 
 
@@ -102,26 +103,51 @@ router.get('/', async function (req, res) {
 
 
 
-
+  router.get('/:id/students', async function (req, res, next) {
+    try {
+      const courseId = req.params.id;
+      const students = await getCourseStudents(courseId);
   
+      res.status(200).json({
+        courseId:courseId,
+        enrolled: students
+      });
+    } catch (err) {
+      next(err);
+    }
+  });
 
-router.get('/:id/students', async function (req, res, next) {
-    res.status(200).json({
-        message: 'GET /courses/{id}/students'
-    });
-})
 
-router.post('/:id/students', async function (req, res, next) {
-    res.status(200).json({
-        message: 'POST /courses/{id}/students'
-    });
-})
 
-router.get('/:id/roster', async function (req, res, next) {
-    res.status(200).json({
-        message: 'GET /courses/{id}/roster'
-    });
-})
+  router.post('/:id/students', async function (req, res, next) {
+    try {
+      const courseId = req.params.id;
+      const enrolledStudents = req.body.students;
+  
+      await addEnrolledStudents(courseId, enrolledStudents);
+  
+      res.status(200).json({
+        message: 'Succesfully Enrolled Student'
+      });
+    } catch (err) {
+      next(err);
+    }
+  });
+
+  router.get('/:id/roster', async function (req, res, next) {
+    try {
+      const courseId = req.params.id;
+  
+      const roster = await getCourseRoster(courseId);
+  
+      res.status(200).json({
+        message: 'Roster',
+        roster: roster
+      });
+    } catch (err) {
+      next(err);
+    }
+  });
 
 
 
