@@ -2,9 +2,11 @@ const { Router } = require('express')
 
 const router = Router()
 const { getAllCourses, insertCourse, getCourseById, updateCourse, deleteCourse,
-  getAssignmentsByCourse, getCourseStudents, addEnrolledStudents, getCourseRoster } = require('../models/courses');
+  getAssignmentsByCourse, getCourseStudents, addEnrolledStudents, getCourseRoster, CourseSchema } = require('../models/courses');
 
 const { requireAuthentication } = require("../lib/auth");
+const { validateAgainstSchema } = require('../lib/validation')
+const {getUserByEmail } = require('../models/users');
 
 const { ObjectId } = require('mongodb');
 
@@ -21,8 +23,8 @@ router.get('/', async function (req, res) {
 
 
 router.post('/', requireAuthentication, async function (req, res, next) {
-  if (validateAgainstSchema(req.body, UserSchema)) {
-    const requestingUser = req.user;
+  if (validateAgainstSchema(req.body, CourseSchema)) {
+    const permissionsRole = await getUserByEmail(req.user.id)
 
     const course = {
       subject: req.body.subject,
@@ -33,7 +35,7 @@ router.post('/', requireAuthentication, async function (req, res, next) {
     };
 
     try {
-      if (!requestingUser.isAdmin) {
+      if (permissionsRole.role != "admin") {
         return res.status(403).send({ error: 'Forbidden: You are not allowed to post a course.' });
       }
 
@@ -76,9 +78,11 @@ router.get('/:id', async function (req, res, next) {
 router.patch('/:id', requireAuthentication, async function (req, res, next) {
   if (Object.keys(req.body).some(field => ["subject", "number", "title", "term", "instructorId"].includes(field))) {
     try {
-      const requestingUser = req.user;
-      const courseId = parseInt(req.params.id);
+      const permissionsRole = await getUserByEmail(req.user.id)
+      //const requestingUser = req.user;
+      const courseId = req.params.id;
 
+      /*
       // Retrieve the existing course
       const existingCourse = await getCourseById(courseId);
 
@@ -86,9 +90,10 @@ router.patch('/:id', requireAuthentication, async function (req, res, next) {
       if (!existingCourse) {
         return res.status(404).json({ error: 'Course not found' });
       }
+      */
 
       // Check authorization
-      if (requestingUser.role !== 'admin' || !!(requestingUser.role === 'instructor' && requestingUser.id === existingCourse.instructorId)) {
+      if (permissionsRole.role !== 'admin' || !!(permissionsRole.role === 'instructor' && permissionsRole._id === existingCourse.instructorId)) {
         return res.status(403).json({ error: 'Forbidden: You are not allowed to update this course' });
       }
 
@@ -100,7 +105,7 @@ router.patch('/:id', requireAuthentication, async function (req, res, next) {
         instructorId: parseInt(req.body.instructorId)
       };
 
-      const modifiedCount = await updateCourse(id, updatedCourse);
+      const modifiedCount = await updateCourse(courseId, updatedCourse);
 
       res.status(200).json({
         message: 'Course updated successfully',
@@ -119,18 +124,11 @@ router.patch('/:id', requireAuthentication, async function (req, res, next) {
 
 router.delete('/:id', requireAuthentication, async function (req, res, next) {
   try {
-    const courseId = parseInt(req.params.id);
+    const courseId = req.params.id;
 
-    // Retrieve the existing course
-    const existingCourse = await getCourseById(courseId);
-
-    // Check if the course exists
-    if (!existingCourse) {
-      return res.status(404).json({ error: 'Course not found' });
-    }
-
+    const permissionsRole = await getUserByEmail(req.user.id)
     // Check authorization
-    if (requestingUser.role !== 'admin') {
+    if (permissionsRole.role !== 'admin') {
       return res.status(403).json({ error: 'Forbidden: You are not allowed to update this course' });
     }
 
@@ -148,9 +146,12 @@ router.delete('/:id', requireAuthentication, async function (req, res, next) {
 
 router.get('/:id/students', requireAuthentication, async function (req, res, next) {
   try {
-    const requestingUser = req.user;
-    const courseId = parseInt(req.params.id);
 
+    const permissionsRole = await getUserByEmail(req.user.id)
+    //const requestingUser = req.user;
+    const courseId = req.params.id;
+
+    /*
     // Retrieve the existing course
     const existingCourse = await getCourseById(courseId);
 
@@ -158,9 +159,10 @@ router.get('/:id/students', requireAuthentication, async function (req, res, nex
     if (!existingCourse) {
       return res.status(404).json({ error: 'Course not found' });
     }
+    */
 
     // Check authorization
-    if (requestingUser.role !== 'admin' || !!(requestingUser.role === 'instructor' && requestingUser.id === existingCourse.instructorId)) {
+    if (permissionsRole.role !== 'admin' || !!(permissionsRole.role === 'instructor' && permissionsRole._id === existingCourse.instructorId)) {
       return res.status(403).json({ error: 'Forbidden: You are not allowed to retrieve information about this course' });
     }
 
@@ -177,10 +179,17 @@ router.get('/:id/students', requireAuthentication, async function (req, res, nex
 
 
 
-router.post('/:id/students', async function (req, res, next) {
+router.post('/:id/students', requireAuthentication, async function (req, res, next) {
   try {
+
+    const permissionsRole = await getUserByEmail(req.user.id)
     const courseId = req.params.id;
     const enrolledStudents = req.body.students;
+
+    // Check authorization
+    if (permissionsRole.role !== 'admin' || !!(permissionsRole.role === 'instructor' && permissionsRole._id === existingCourse.instructorId)) {
+      return res.status(403).json({ error: 'Forbidden: You are not allowed to retrieve information about this course' });
+    }
 
     await addEnrolledStudents(courseId, enrolledStudents);
 
@@ -192,10 +201,16 @@ router.post('/:id/students', async function (req, res, next) {
   }
 });
 
-router.get('/:id/roster', async function (req, res, next) {
+router.get('/:id/roster', requireAuthentication, async function (req, res, next) {
   try {
-    const courseId = req.params.id;
 
+    const permissionsRole = await getUserByEmail(req.user.id)
+    const courseId = req.params.id;
+    
+    if (permissionsRole.role !== 'admin' || !!(permissionsRole.role === 'instructor' && permissionsRole._id === existingCourse.instructorId)) {
+      return res.status(403).json({ error: 'Forbidden: You are not allowed to retrieve information about this course' });
+    }
+    
     const roster = await getCourseRoster(courseId);
 
     res.status(200).json({

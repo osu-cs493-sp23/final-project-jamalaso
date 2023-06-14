@@ -33,8 +33,6 @@ router.post('/', requireAuthentication, async (req, res) => {
     };
 
     try {
-
-
       const permissionsRole = await getUserByEmail(requestingUser.id)
       if (permissionsRole.role !== 'admin' && (newUser.role === 'admin' || newUser.role === 'instructor')) {
         return res.status(403).send({ error: 'Forbidden: You are not allowed to create an admin user.' });
@@ -83,8 +81,11 @@ router.post('/login', async function (req, res, next) {
 
 
 router.get('/:id', requireAuthentication, async function (req, res, next) {
-  const requestingUserId = req.user.id;
-  const requestedUserId = parseInt(req.params.id);
+  const permissionsRole = await getUserByEmail(req.user.id)
+  const requestingUserId = String(permissionsRole._id);
+  const requestedUserId = String(req.params.id);
+
+  console.log("first= " + requestedUserId + "\nsecond = " + requestingUserId)
 
   // Check if the authenticated user matches the requested user
   if (requestingUserId !== requestedUserId) {
@@ -92,7 +93,7 @@ router.get('/:id', requireAuthentication, async function (req, res, next) {
   }
 
   try {
-    const userDetails = await getUserById(requestedUserId);
+    const userDetails = await getUserById(new ObjectId(requestedUserId));
 
     if (!userDetails) {
       return res.status(404).json({ error: 'User not found' });

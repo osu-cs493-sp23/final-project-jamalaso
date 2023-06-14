@@ -51,7 +51,7 @@ async function getCourseById(id) {
   const db = getDbReference();
   const collection = db.collection('courses');
 
-  const course = await collection.findOne({ _id: id }).project({ students: 0, assignments: 0 });
+  const course = await collection.findOne({ _id: id });
   return course;
 }
 exports.getCourseById = getCourseById;
@@ -97,10 +97,8 @@ async function getCourseStudents(courseId) {
   const db = getDbReference();
   const collection = db.collection('students');
 
-  const students = await collection.find({ courseId: courseId }).toArray();
-  const enrolledUserIds = students.map(student => student._id.toString());
-  
-  return enrolledUserIds;
+  const course = await collection.findOne({ courseId: courseId });
+  return course ? course.enrolled : [];
 }
 exports.getCourseStudents = getCourseStudents;
 
