@@ -32,7 +32,7 @@ router.post('/', requireAuthentication, async (req, res) => {
     };
 
     try {
-      if (!requestingUser.isAdmin && (newUser.role === 'admin' || newUser.role === 'instructor')) {
+      if (requestingUser.role !== 'admin' && (newUser.role === 'admin' || newUser.role === 'instructor')) {
         return res.status(403).send({ error: 'Forbidden: You are not allowed to create an admin user.' });
       }
 
@@ -44,7 +44,7 @@ router.post('/', requireAuthentication, async (req, res) => {
     }
   } else {
     res.status(400).send({
-      error: "Request body is not a valid business object."
+      error: "Request body is not a valid user object or an invalid 'role' was specified."
     })
   }
 })
@@ -90,17 +90,17 @@ router.get('/:id', requireAuthentication, async function (req, res, next) {
   try {
     const userDetails = await getUserById(requestedUserId);
 
-    if (!user) {
+    if (!userDetails) {
       return res.status(404).json({ error: 'User not found' });
     }
 
     // const { password, ...userDetails } = user;
 
-    if (user.role === 'instructor') {
+    if (req.user.role === 'instructor') {
       // Get the list of course IDs taught by the instructor
       const courses = await getCoursesByInstructorId(requestedUserId);
       userDetails.coursesTaught = courses.map(course => course.id);
-    } else if (user.role === 'student') {
+    } else if (req.user.role === 'student') {
       // Get the list of course IDs enrolled by the student
       const courses = await getCoursesByStudentId(requestedUserId);
       userDetails.coursesEnrolled = courses.map(course => course.id);

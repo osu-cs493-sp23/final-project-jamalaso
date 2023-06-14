@@ -12,11 +12,30 @@ const CourseSchema = {
 
 exports.CourseSchema = CourseSchema;
 
-async function getAllCourses() {
+async function getAllCourses(page) {
   const db = getDbReference();
   const collection = db.collection('courses');
-  const results = await collection.find().toArray();
-  return results;
+
+  const count = await collection.countDocuments();
+  const pageSize = 10;
+  const lastPage = Math.ceil(count / pageSize);
+  page = page < 1 ? 1 : page;
+  const offset = (page - 1) * pageSize;
+
+  const results = await collection.find({})
+    .project({ students: 0, assignments: 0 })
+    .sort({ _id: 1 })
+    .skip(offset)
+    .limit(pageSize)
+    .toArray();
+
+  return {
+    courses: results,
+    page: page,
+    totalPages: lastPage,
+    pageSize: pageSize,
+    count: count
+  };
 }
 exports.getAllCourses = getAllCourses;
 
@@ -32,7 +51,7 @@ async function getCourseById(id) {
   const db = getDbReference();
   const collection = db.collection('courses');
 
-  const course = await collection.findOne({ _id: id });
+  const course = await collection.findOne({ _id: id }).project({ students: 0, assignments: 0 });
   return course;
 }
 exports.getCourseById = getCourseById;
@@ -78,8 +97,10 @@ async function getCourseStudents(courseId) {
   const db = getDbReference();
   const collection = db.collection('students');
 
-  const course = await collection.findOne({ courseId: courseId });
-  return course ? course.enrolled : [];
+  const students = await collection.find({ courseId: courseId }).toArray();
+  const enrolledUserIds = students.map(student => student._id.toString());
+  
+  return enrolledUserIds;
 }
 exports.getCourseStudents = getCourseStudents;
 
