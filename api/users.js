@@ -3,9 +3,10 @@ const router = Router()
 const bcrypt = require('bcryptjs');
 const { ObjectId } = require('mongodb');
 
+const { validateAgainstSchema } = require('../lib/validation')
 const { generateAuthToken, requireAuthentication } = require("../lib/auth")
 
-const { validateUser, getAllUsers, getUserById, insertUser, UserSchema } = require('../models/users');
+const { validateUser, getAllUsers, getUserById, insertUser, UserSchema, getUserByEmail } = require('../models/users');
 const { getCoursesByInstructorId, getCoursesByStudentId } = require('../models/courses');
 
 //FOR TESTING PURPOSES
@@ -32,7 +33,10 @@ router.post('/', requireAuthentication, async (req, res) => {
     };
 
     try {
-      if (requestingUser.role !== 'admin' && (newUser.role === 'admin' || newUser.role === 'instructor')) {
+
+
+      const permissionsRole = await getUserByEmail(requestingUser.id)
+      if (permissionsRole.role !== 'admin' && (newUser.role === 'admin' || newUser.role === 'instructor')) {
         return res.status(403).send({ error: 'Forbidden: You are not allowed to create an admin user.' });
       }
 
