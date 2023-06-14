@@ -6,8 +6,12 @@ const UserSchema = {
     name: { type: String, required: true },
     email: { type: String, required: true },
     password: { type: String, required: true },
-    role: { type: String, required: true }
-}
+    role: {
+        type: String,
+        required: true,
+        enum: ['admin', 'instructor', 'student'],
+    },
+};
 exports.UserSchema = UserSchema
 
 async function insertUser(user) {
@@ -16,7 +20,7 @@ async function insertUser(user) {
     const result = await collection.insertOne(user);
     return result.insertedId;
 }
-  
+
 exports.insertUser = insertUser;
 
 
@@ -32,25 +36,25 @@ exports.getAllUsers = getAllUsers;
 async function getUserById(id) {
     const db = getDbReference();
     const collection = db.collection('users');
-  
+
     const user = await collection.findOne({ _id: id });
     console.log(user)
     return user;
 }
 exports.getUserById = getUserById;
-  
-  
+
+
 
 
 async function getUserByEmail(email) {
     const db = getDbReference();
     const collection = db.collection('users');
-    
+
     const user = await collection.findOne({ email });
     return user;
-  }
-  exports.getUserByEmail = getUserByEmail;
-  
+}
+exports.getUserByEmail = getUserByEmail;
+
 
 
 exports.validateUser = async function (email, password) {

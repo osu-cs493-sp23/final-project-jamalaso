@@ -5,12 +5,8 @@ const { ObjectId } = require('mongodb');
 
 const { generateAuthToken, requireAuthentication } = require("../lib/auth")
 
-const { getAllUsers, getUserById, insertUser, UserSchema } = require('../models/users');
-
-const {
-  validateUser
-} = require('../models/users')
-
+const { validateUser, getAllUsers, getUserById, insertUser, UserSchema } = require('../models/users');
+const { getCoursesByInstructorId, getCoursesByStudentId } = require('../models/courses');
 
 //FOR TESTING PURPOSES
 router.get('/', async function (req, res) {
@@ -24,21 +20,34 @@ router.get('/', async function (req, res) {
 });
 
 
-router.post('/', async function (req, res) {
-  try {
+router.post('/', requireAuthentication, async (req, res) => {
+  if (validateAgainstSchema(req.body, UserSchema)) {
+    const requestingUser = req.user;
+
     const newUser = {
       name: req.body.name,
       email: req.body.email,
       password: bcrypt.hashSync(req.body.password, 8),
       role: req.body.role
     };
-    const insertedId = await insertUser(newUser);
-    res.status(201).json({ insertedId });
-  } catch (error) {
-    console.error('Failed to insert user:', error);
-    res.status(500).json({ error: 'Failed to create user' });
+
+    try {
+      if (!requestingUser.isAdmin && (newUser.role === 'admin' || newUser.role === 'instructor')) {
+        return res.status(403).send({ error: 'Forbidden: You are not allowed to create an admin user.' });
+      }
+
+      const id = await insertUser(newUser);
+      res.status(201).send({ id });
+
+    } catch (err) {
+      next(err)
+    }
+  } else {
+    res.status(400).send({
+      error: "Request body is not a valid business object."
+    })
   }
-});
+})
 
 
 router.post('/login', async function (req, res, next) {
@@ -69,18 +78,33 @@ router.post('/login', async function (req, res, next) {
 })
 
 
-router.get('/:id', async function (req, res, next) {
-  const reqId = req.params.id;
-  try {
+router.get('/:id', requireAuthentication, async function (req, res, next) {
+  const requestingUserId = req.user.id;
+  const requestedUserId = parseInt(req.params.id);
 
-    const id = new ObjectId(reqId);
-    const user = await getUserById(id);
+  // Check if the authenticated user matches the requested user
+  if (requestingUserId !== requestedUserId) {
+    return res.status(403).json({ error: 'Forbidden: You are not allowed to access this user\'s information.' });
+  }
+
+  try {
+    const userDetails = await getUserById(requestedUserId);
 
     if (!user) {
       return res.status(404).json({ error: 'User not found' });
     }
 
-    const { password, ...userDetails } = user;
+    // const { password, ...userDetails } = user;
+
+    if (user.role === 'instructor') {
+      // Get the list of course IDs taught by the instructor
+      const courses = await getCoursesByInstructorId(requestedUserId);
+      userDetails.coursesTaught = courses.map(course => course.id);
+    } else if (user.role === 'student') {
+      // Get the list of course IDs enrolled by the student
+      const courses = await getCoursesByStudentId(requestedUserId);
+      userDetails.coursesEnrolled = courses.map(course => course.id);
+    }
 
     res.status(200).json({ user: userDetails });
   } catch (error) {
@@ -90,9 +114,5 @@ router.get('/:id', async function (req, res, next) {
     });
   }
 });
-
-
-
-
 
 module.exports = router
