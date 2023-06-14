@@ -97,8 +97,8 @@ async function getCourseStudents(courseId) {
   const db = getDbReference();
   const collection = db.collection('students');
 
-  const course = await collection.findOne({ courseId: courseId });
-  return course ? course.enrolled : [];
+  const students = await collection.find({ courseId: courseId }).toArray();;
+  return students;
 }
 exports.getCourseStudents = getCourseStudents;
 

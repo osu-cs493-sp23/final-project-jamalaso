@@ -11,6 +11,7 @@ const {getUserByEmail } = require('../models/users');
 const { ObjectId } = require('mongodb');
 
 
+
 router.get('/', async function (req, res) {
   try {
     const courses = await getAllCourses(req.query.page || 1);
@@ -20,6 +21,7 @@ router.get('/', async function (req, res) {
     res.status(500).json({ error: 'Failed to fetch courses' });
   }
 });
+
 
 
 router.post('/', requireAuthentication, async function (req, res, next) {
@@ -41,7 +43,7 @@ router.post('/', requireAuthentication, async function (req, res, next) {
 
       const courseId = await insertCourse(course);
 
-      res.status(200).json({
+      res.status(201).json({
         message: 'Course inserted successfully',
         courseId: courseId
       });
@@ -54,6 +56,7 @@ router.post('/', requireAuthentication, async function (req, res, next) {
     })
   }
 });
+
 
 
 router.get('/:id', async function (req, res, next) {
@@ -75,14 +78,13 @@ router.get('/:id', async function (req, res, next) {
 });
 
 
+
 router.patch('/:id', requireAuthentication, async function (req, res, next) {
   if (Object.keys(req.body).some(field => ["subject", "number", "title", "term", "instructorId"].includes(field))) {
     try {
       const permissionsRole = await getUserByEmail(req.user.id)
-      //const requestingUser = req.user;
       const courseId = req.params.id;
-
-      /*
+      
       // Retrieve the existing course
       const existingCourse = await getCourseById(courseId);
 
@@ -90,7 +92,6 @@ router.patch('/:id', requireAuthentication, async function (req, res, next) {
       if (!existingCourse) {
         return res.status(404).json({ error: 'Course not found' });
       }
-      */
 
       // Check authorization
       if (permissionsRole.role !== 'admin' || !!(permissionsRole.role === 'instructor' && permissionsRole._id === existingCourse.instructorId)) {
@@ -102,7 +103,7 @@ router.patch('/:id', requireAuthentication, async function (req, res, next) {
         number: req.body.number,
         title: req.body.title,
         term: req.body.term,
-        instructorId: parseInt(req.body.instructorId)
+        instructorId: req.body.instructorId
       };
 
       const modifiedCount = await updateCourse(courseId, updatedCourse);
@@ -116,10 +117,11 @@ router.patch('/:id', requireAuthentication, async function (req, res, next) {
     }
   } else {
     res.status(400).send({
-      err: "Request body does not contain a valid Business."
+      err: "Request body does not contain a valid Course."
     });
   }
 });
+
 
 
 router.delete('/:id', requireAuthentication, async function (req, res, next) {
@@ -144,6 +146,7 @@ router.delete('/:id', requireAuthentication, async function (req, res, next) {
 });
 
 
+
 router.get('/:id/students', requireAuthentication, async function (req, res, next) {
   try {
 
@@ -151,7 +154,6 @@ router.get('/:id/students', requireAuthentication, async function (req, res, nex
     //const requestingUser = req.user;
     const courseId = req.params.id;
 
-    /*
     // Retrieve the existing course
     const existingCourse = await getCourseById(courseId);
 
@@ -159,7 +161,6 @@ router.get('/:id/students', requireAuthentication, async function (req, res, nex
     if (!existingCourse) {
       return res.status(404).json({ error: 'Course not found' });
     }
-    */
 
     // Check authorization
     if (permissionsRole.role !== 'admin' || !!(permissionsRole.role === 'instructor' && permissionsRole._id === existingCourse.instructorId)) {
@@ -186,6 +187,14 @@ router.post('/:id/students', requireAuthentication, async function (req, res, ne
     const courseId = req.params.id;
     const enrolledStudents = req.body.students;
 
+    // Retrieve the existing course
+    const existingCourse = await getCourseById(courseId);
+
+    // Check if the course exists
+    if (!existingCourse) {
+      return res.status(404).json({ error: 'Course not found' });
+    }
+
     // Check authorization
     if (permissionsRole.role !== 'admin' || !!(permissionsRole.role === 'instructor' && permissionsRole._id === existingCourse.instructorId)) {
       return res.status(403).json({ error: 'Forbidden: You are not allowed to retrieve information about this course' });
@@ -200,6 +209,8 @@ router.post('/:id/students', requireAuthentication, async function (req, res, ne
     next(err);
   }
 });
+
+
 
 router.get('/:id/roster', requireAuthentication, async function (req, res, next) {
   try {
@@ -224,12 +235,19 @@ router.get('/:id/roster', requireAuthentication, async function (req, res, next)
 
 
 
-
 router.get('/:id/assignments', async function (req, res, next) {
   try {
     const courseId = req.params.id;
+    
+    // Retrieve the existing course
+    const existingCourse = await getCourseById(courseId);
+    
+    // Check if the course exists
+    if (!existingCourse) {
+      return res.status(404).json({ error: 'Course not found' });
+    }
+    
     const assignments = await getAssignmentsByCourse(courseId);
-
     res.status(200).json({
       assignments: assignments
     });
@@ -237,7 +255,6 @@ router.get('/:id/assignments', async function (req, res, next) {
     next(err);
   }
 });
-
 
 
 module.exports = router

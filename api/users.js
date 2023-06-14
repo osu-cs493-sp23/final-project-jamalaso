@@ -93,13 +93,11 @@ router.get('/:id', requireAuthentication, async function (req, res, next) {
   }
 
   try {
-    const userDetails = await getUserById(new ObjectId(requestedUserId));
+    const userDetails = await getUserByEmail(new ObjectId(requestedUserId));
 
     if (!userDetails) {
       return res.status(404).json({ error: 'User not found' });
     }
-
-    // const { password, ...userDetails } = user;
 
     if (req.user.role === 'instructor') {
       // Get the list of course IDs taught by the instructor

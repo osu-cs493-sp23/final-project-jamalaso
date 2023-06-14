@@ -14,6 +14,8 @@ const UserSchema = {
 };
 exports.UserSchema = UserSchema
 
+
+
 async function insertUser(user) {
     const db = getDbReference();
     const collection = db.collection('users');
@@ -22,6 +24,7 @@ async function insertUser(user) {
 }
 
 exports.insertUser = insertUser;
+
 
 
 async function getAllUsers() {
@@ -33,16 +36,19 @@ async function getAllUsers() {
 exports.getAllUsers = getAllUsers;
 
 
+
 async function getUserById(id) {
     const db = getDbReference();
     const collection = db.collection('users');
 
-    const user = await collection.findOne({ _id: id });
+    const user = await collection.findOne(
+        { _id: id },
+        { projection: { password: 0 } }
+    );
     console.log(user)
     return user;
 }
 exports.getUserById = getUserById;
-
 
 
 
