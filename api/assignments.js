@@ -6,6 +6,8 @@ const { getAllAssignments, insertAssignment, getAssignmentById, updateAssignment
 const { ObjectId } = require('mongodb');
 
 
+
+//TEST FUNCTION TO GET ALL ASSIGNMENTS
 router.get('/', async function (req, res) {
     try {
       const assignments = await getAllAssignments();
@@ -18,6 +20,8 @@ router.get('/', async function (req, res) {
 
 
   router.post('/', async function (req, res, next) {
+    const permissionsRole = await getUserByEmail(req.user.id)
+    
     try {
       const assignment = {
         courseId: req.body.courseId,
