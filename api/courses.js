@@ -33,7 +33,7 @@ router.post('/', requireAuthentication, async function (req, res, next) {
       number: req.body.number,
       title: req.body.title,
       term: req.body.term,
-      instructorId: parseInt(req.body.instructorId)
+      instructorId: req.body.instructorId
     };
 
     try {
@@ -60,7 +60,7 @@ router.post('/', requireAuthentication, async function (req, res, next) {
 
 
 router.get('/:id', async function (req, res, next) {
-  const reqId = parseInt(req.params.id);
+  const reqId = req.params.id;
   try {
     const course = await getCourseById(reqId);
 
@@ -87,14 +87,21 @@ router.patch('/:id', requireAuthentication, async function (req, res, next) {
       
       // Retrieve the existing course
       const existingCourse = await getCourseById(courseId);
+      // console.log(" ======permissionsRole:", String(permissionsRole._id))
+      // console.log(" ======permissionsRole role:", permissionsRole.role)
+      // console.log(" ======existingCourse:", existingCourse.instructorId)
 
       // Check if the course exists
       if (!existingCourse) {
         return res.status(404).json({ error: 'Course not found' });
       }
 
+      // console.log("Bool: ", String(permissionsRole._id) === existingCourse.instructorId)
+      // console.log("Bool 2: ", !(permissionsRole.role === 'instructor' && String(permissionsRole._id) === existingCourse.instructorId))
+      // console.log("Bool 3: ", permissionsRole.role !== 'admin')
+      
       // Check authorization
-      if (permissionsRole.role !== 'admin' || !!(permissionsRole.role === 'instructor' && permissionsRole._id === existingCourse.instructorId)) {
+      if (permissionsRole.role !== 'admin' && !(permissionsRole.role === 'instructor' && String(permissionsRole._id) === existingCourse.instructorId)) {
         return res.status(403).json({ error: 'Forbidden: You are not allowed to update this course' });
       }
 
@@ -151,7 +158,6 @@ router.get('/:id/students', requireAuthentication, async function (req, res, nex
   try {
 
     const permissionsRole = await getUserByEmail(req.user.id)
-    //const requestingUser = req.user;
     const courseId = req.params.id;
 
     // Retrieve the existing course
@@ -163,7 +169,7 @@ router.get('/:id/students', requireAuthentication, async function (req, res, nex
     }
 
     // Check authorization
-    if (permissionsRole.role !== 'admin' || !!(permissionsRole.role === 'instructor' && permissionsRole._id === existingCourse.instructorId)) {
+    if (permissionsRole.role !== 'admin' && !(permissionsRole.role === 'instructor' && String(permissionsRole._id) === existingCourse.instructorId)) {
       return res.status(403).json({ error: 'Forbidden: You are not allowed to retrieve information about this course' });
     }
 
@@ -171,7 +177,7 @@ router.get('/:id/students', requireAuthentication, async function (req, res, nex
 
     res.status(200).json({
       courseId: courseId,
-      enrolled: students
+      students: students
     });
   } catch (err) {
     next(err);
@@ -196,7 +202,7 @@ router.post('/:id/students', requireAuthentication, async function (req, res, ne
     }
 
     // Check authorization
-    if (permissionsRole.role !== 'admin' || !!(permissionsRole.role === 'instructor' && permissionsRole._id === existingCourse.instructorId)) {
+    if (permissionsRole.role !== 'admin' && !(permissionsRole.role === 'instructor' && String(permissionsRole._id) === existingCourse.instructorId)) {
       return res.status(403).json({ error: 'Forbidden: You are not allowed to retrieve information about this course' });
     }
 
@@ -218,7 +224,7 @@ router.get('/:id/roster', requireAuthentication, async function (req, res, next)
     const permissionsRole = await getUserByEmail(req.user.id)
     const courseId = req.params.id;
     
-    if (permissionsRole.role !== 'admin' || !!(permissionsRole.role === 'instructor' && permissionsRole._id === existingCourse.instructorId)) {
+    if (permissionsRole.role !== 'admin' && !(permissionsRole.role === 'instructor' && String(permissionsRole._id) === existingCourse.instructorId)) {
       return res.status(403).json({ error: 'Forbidden: You are not allowed to retrieve information about this course' });
     }
     

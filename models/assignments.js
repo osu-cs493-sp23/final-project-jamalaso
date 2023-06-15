@@ -31,7 +31,7 @@ async function getAssignmentById(id) {
     const db = getDbReference();
     const collection = db.collection('assignments');
 
-    const assignment = await collection.findOne({ _id: id });
+    const assignment = await collection.findOne({ _id: new ObjectId(id) });
     return assignment;
 }
 exports.getAssignmentById = getAssignmentById;
@@ -66,22 +66,25 @@ async function getSubmissions(assignmentId, page) {
     const collection = db.collection('submissions');
 
     const count = await collection.countDocuments();
-    const pageSize = 10;
+    const pageSize = 5;
     const lastPage = Math.ceil(count / pageSize);
     page = page < 1 ? 1 : page;
     const offset = (page - 1) * pageSize;
 
     const submissions = await collection.find({ assignmentId: assignmentId })
-    .skip(offset)
-    .limit(pageSize)
-    .toArray();
+        .skip(offset)
+        .limit(pageSize)
+        .toArray();
 
     return {
         submissions: submissions,
         page: page,
         totalPages: lastPage,
         pageSize: pageSize,
-        totalCount: count
+        links: {
+            nextPage: page < lastPage ? `/assignments/${assignmentId}?page=${Number(page) + 1}` : null,
+            lastPage: page > 1 ? `/assignments/${assignmentId}?page=${Number(page) - 1}` : null
+        }
     };
 }
 exports.getSubmissions = getSubmissions;

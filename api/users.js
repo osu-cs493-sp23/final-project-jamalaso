@@ -6,7 +6,7 @@ const { ObjectId } = require('mongodb');
 const { validateAgainstSchema } = require('../lib/validation')
 const { generateAuthToken, requireAuthentication } = require("../lib/auth")
 
-const { validateUser, getAllUsers, getUserById, insertUser, UserSchema, getUserByEmail } = require('../models/users');
+const { validateUser, getAllUsers, getUserById, insertUser, UserSchema, getUserByEmail, LoginSchema } = require('../models/users');
 const { getCoursesByInstructorId, getCoursesByStudentId } = require('../models/courses');
 
 //FOR TESTING PURPOSES
@@ -35,7 +35,7 @@ router.post('/', requireAuthentication, async (req, res) => {
     try {
       const permissionsRole = await getUserByEmail(requestingUser.id)
       if (permissionsRole.role !== 'admin' && (newUser.role === 'admin' || newUser.role === 'instructor')) {
-        return res.status(403).send({ error: 'Forbidden: You are not allowed to create an admin user.' });
+        return res.status(403).send({ error: 'Forbidden: You are not allowed to create an admin or instructor user.' });
       }
 
       const id = await insertUser(newUser);
@@ -53,7 +53,7 @@ router.post('/', requireAuthentication, async (req, res) => {
 
 
 router.post('/login', async function (req, res, next) {
-  if (req.body && req.body.email && req.body.password) {
+  if (validateAgainstSchema(req.body, LoginSchema)) {
       try {
           const authenticated = await validateUser(
               req.body.email,
@@ -70,6 +70,7 @@ router.post('/login', async function (req, res, next) {
               })
           }
       } catch (e) {
+        console.log("GOT HERE")
           next(e)
       }
   } else {
@@ -93,7 +94,7 @@ router.get('/:id', requireAuthentication, async function (req, res, next) {
   }
 
   try {
-    const userDetails = await getUserByEmail(new ObjectId(requestedUserId));
+    const userDetails = await getUserById(new ObjectId(requestedUserId));
 
     if (!userDetails) {
       return res.status(404).json({ error: 'User not found' });

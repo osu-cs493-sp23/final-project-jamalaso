@@ -14,6 +14,12 @@ const UserSchema = {
 };
 exports.UserSchema = UserSchema
 
+const LoginSchema = {
+    email: { type: String, required: true },
+    password: { type: String, required: true },
+};
+exports.LoginSchema = LoginSchema
+
 
 
 async function insertUser(user) {

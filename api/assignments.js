@@ -5,6 +5,7 @@ const { getAllAssignments, insertAssignment, getAssignmentById, updateAssignment
   getSubmissions, addSubmission, AssignmentsSchema } = require('../models/assignments');
 
 const { getCourseById } = require('../models/courses');
+const {getUserByEmail } = require('../models/users');
 
 const { requireAuthentication } = require("../lib/auth");
 const { validateAgainstSchema } = require('../lib/validation')
@@ -36,9 +37,16 @@ router.post('/', requireAuthentication, async function (req, res, next) {
     };
 
     try {
+      // Retrieve the existing course
+      const existingCourse = await getCourseById(req.body.courseId);
+
+      // Check if the course exists
+      if (!existingCourse) {
+        return res.status(404).json({ error: 'Course not found' });
+      }
 
       // Check authorization
-      if (permissionsRole.role !== 'admin' || !!(permissionsRole.role === 'instructor' && permissionsRole._id === existingCourse.instructorId)) {
+      if (permissionsRole.role !== 'admin' && !(permissionsRole.role === 'instructor' && String(permissionsRole._id) === existingCourse.instructorId)) {
         return res.status(403).json({ error: 'Forbidden: You are not allowed to update this course' });
       }
 
@@ -46,7 +54,7 @@ router.post('/', requireAuthentication, async function (req, res, next) {
 
       res.status(201).json({
         message: 'Assignment inserted successfully',
-        courseId: assignmentId
+        assignmentId: assignmentId
       });
     } catch (err) {
       next(err);
@@ -104,7 +112,7 @@ router.patch('/:id', requireAuthentication, async function (req, res, next) {
       }
 
       // Check authorization
-      if (permissionsRole.role !== 'admin' || !!(permissionsRole.role === 'instructor' && permissionsRole._id === existingCourse.instructorId)) {
+      if (permissionsRole.role !== 'admin' && !(permissionsRole.role === 'instructor' && String(permissionsRole._id) === existingCourse.instructorId)) {
         return res.status(403).json({ error: 'Forbidden: You are not allowed to update this assignment' });
       }
 
@@ -155,7 +163,7 @@ router.delete('/:id', requireAuthentication, async function (req, res, next) {
     }
 
     // Check authorization
-    if (permissionsRole.role !== 'admin' || !!(permissionsRole.role === 'instructor' && permissionsRole._id === existingCourse.instructorId)) {
+    if (permissionsRole.role !== 'admin' && !(permissionsRole.role === 'instructor' && String(permissionsRole._id) === existingCourse.instructorId)) {
       return res.status(403).json({ error: 'Forbidden: You are not allowed to delete this assignment' });
     }
 
@@ -194,15 +202,15 @@ router.get('/:id/submissions', requireAuthentication, async function (req, res, 
     }
 
     // Check authorization
-    if (permissionsRole.role !== 'admin' || !!(permissionsRole.role === 'instructor' && permissionsRole._id === existingCourse.instructorId)) {
-      return res.status(403).json({ error: 'Forbidden: You are not allowed to delete this assignment' });
+    if (permissionsRole.role !== 'admin' && !(permissionsRole.role === 'instructor' && String(permissionsRole._id) === existingCourse.instructorId)) {
+      return res.status(403).json({ error: 'Forbidden: You are not allowed to view the submissions for this assignment' });
     }
 
     const submissions = await getSubmissions(assignmentId, (req.query.page || 1));
 
-    res.status(200).json({
-      submissions: submissions
-    });
+    res.status(200).send(
+      submissions
+    );
   } catch (err) {
     next(err);
   }
@@ -223,7 +231,7 @@ router.post('/:id/submissions', requireAuthentication, async function (req, res,
 
     const insertedId = await addSubmission(newSubmission);
 
-    res.status(200).json({
+    res.status(201).json({
       insertedId: insertedId
     });
   } catch (err) {

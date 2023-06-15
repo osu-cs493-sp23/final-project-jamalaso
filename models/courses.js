@@ -17,7 +17,7 @@ async function getAllCourses(page) {
   const collection = db.collection('courses');
 
   const count = await collection.countDocuments();
-  const pageSize = 10;
+  const pageSize = 5;
   const lastPage = Math.ceil(count / pageSize);
   page = page < 1 ? 1 : page;
   const offset = (page - 1) * pageSize;
@@ -34,7 +34,11 @@ async function getAllCourses(page) {
     page: page,
     totalPages: lastPage,
     pageSize: pageSize,
-    count: count
+    count: count,
+    links: {
+      nextPage: page < lastPage ? `/courses?page=${page + 1}` : null,
+      lastPage: page > 1 ? `/courses?page=${page - 1}` : null
+    }
   };
 }
 exports.getAllCourses = getAllCourses;
@@ -51,7 +55,7 @@ async function getCourseById(id) {
   const db = getDbReference();
   const collection = db.collection('courses');
 
-  const course = await collection.findOne({ _id: id });
+  const course = await collection.findOne({ _id: new ObjectId(id) });
   return course;
 }
 exports.getCourseById = getCourseById;
@@ -103,6 +107,7 @@ async function getCourseStudents(courseId) {
 exports.getCourseStudents = getCourseStudents;
 
 
+/******** UPDATE FUNCTION TO ADD ENOLLED STUDENTS TO COURSES INSTEAD OF WITHIN STUDENTS */
 async function addEnrolledStudents(courseId, students) {
   const db = getDbReference();
   const collection = db.collection('students');
