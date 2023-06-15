@@ -1,16 +1,40 @@
-const { Router } = require('express')
+const { Router } = require('express');
+const multer = require('multer');
+const crypto = require('node:crypto');
+const mimeTypes = require('mime-types');
 
 const router = Router()
 const { getAllAssignments, insertAssignment, getAssignmentById, updateAssignment, deleteAssignment,
-  getSubmissions, addSubmission, AssignmentsSchema } = require('../models/assignments');
+  getSubmissions, addSubmission, AssignmentsSchema, saveFileInfo, removeUploadedFile, getFileInfoById } = require('../models/assignments');
 
 const { getCourseById } = require('../models/courses');
-const {getUserByEmail } = require('../models/users');
+const { getUserByEmail } = require('../models/users');
 
 const { requireAuthentication } = require("../lib/auth");
 const { validateAgainstSchema } = require('../lib/validation')
 
 const { ObjectId } = require('mongodb');
+
+const fileTypes = {
+  "file/jpeg": "jpg",
+  "file/png": "png",
+  "file/pdf": "pdf"
+}
+
+const upload = multer({
+  storage: multer.diskStorage({
+    destination: `${__dirname}/uploads`,
+    filename: (req, file, callback) => {
+      const filename = crypto.pseudoRandomBytes(16).toString("hex");
+      const extension = mimeTypes.extension(file.mimetype); // Use mimeTypes to get the extension
+      callback(null, `${filename}.${extension}`);
+    }
+  }),
+  fileFilter: (req, file, callback) => {
+    const extension = mimeTypes.extension(file.mimetype);
+    callback(null, !!extension); // Use mimeTypes to validate the file type
+  }
+});
 
 
 //TEST FUNCTION TO GET ALL ASSIGNMENTS
@@ -87,14 +111,12 @@ router.get('/:id', async function (req, res, next) {
 });
 
 
-
-
 router.patch('/:id', requireAuthentication, async function (req, res, next) {
   if (Object.keys(req.body).some(field => ["courseId", "title", "points", "due"].includes(field))) {
     try {
       const permissionsRole = await getUserByEmail(req.user.id)
       const assignmentId = req.params.id;
-      
+
       // Retrieve the existing assignment
       const existingAssignment = await getAssignmentById(assignmentId);
 
@@ -140,7 +162,6 @@ router.patch('/:id', requireAuthentication, async function (req, res, next) {
 });
 
 
-
 router.delete('/:id', requireAuthentication, async function (req, res, next) {
   try {
     const permissionsRole = await getUserByEmail(req.user.id)
@@ -177,7 +198,6 @@ router.delete('/:id', requireAuthentication, async function (req, res, next) {
     next(err);
   }
 });
-
 
 
 router.get('/:id/submissions', requireAuthentication, async function (req, res, next) {
@@ -217,28 +237,104 @@ router.get('/:id/submissions', requireAuthentication, async function (req, res, 
 });
 
 
-
-router.post('/:id/submissions', requireAuthentication, async function (req, res, next) {
+router.post('/:id/submissions', upload.single("file"), requireAuthentication, async function (req, res, next) {
+  console.log(" ===req.body: ", req.body)
   try {
     const assignmentId = req.params.id;
-    const newSubmission = {
-      assignmentId: assignmentId,
-      studentId: req.body.studentId,
-      timestamp: req.body.timestamp,
-      grade: req.body.grade,
-      file: req.body.file
-    };
+    console.log(" ===req.file: ", req.file)
+    if (req.file && req.body) {
+      const file = {
+        contentType: req.file.mimetype,
+        filename: req.file.filename,
+        assignmentId: assignmentId,
+        studentId: req.body.studentId,
+        timestamp: req.body.timestamp,
+        url: `assignments/submission/${req.file.filename}`
+      };
 
-    const insertedId = await addSubmission(newSubmission);
+      console.log(" ====file: ", file)
 
-    res.status(201).json({
-      insertedId: insertedId
-    });
+      const id = await saveFileInfo(file)
+
+      // const insertedId = await addSubmission(newSubmission);
+      await removeUploadedFile(req.file);
+      res.status(200).send({ id: id });
+    } else {
+      res.status(400).send({
+        err: "Request body needs submission file."
+      })
+    }
   } catch (err) {
     next(err);
   }
 });
 
+/***
+ * 
+router.get("/submissions/:id", requireAuthentication, async function (req, res, next) {
+  const permissionsRole = await getUserByEmail(req.user.id)
+  const submissionId = req.params.id;
 
+  try {
+    // Retrieve the existing assignment
+    const existingSubmission = await getAssignmentById(submissionId);
+
+    // Check if the assignment exists
+    if (!existingSubmission) {
+      return res.status(404).json({ error: 'Assignment not found' });
+    }
+
+    // Retrieve the existing course
+    const existingCourse = await getCourseById(existingAssignment.courseId);
+
+    // Check if the course exists
+    if (!existingCourse) {
+      return res.status(404).json({ error: 'Course not found' });
+    }
+
+    // Check authorization
+    if (permissionsRole.role !== 'admin' && !(permissionsRole.role === 'instructor' && String(permissionsRole._id) === existingCourse.instructorId)) {
+      return res.status(403).json({ error: 'Forbidden: You are not allowed to view the submissions for this assignment' });
+    }
+
+    const submissions = await getSubmissions(assignmentId, (req.query.page || 1));
+
+    res.status(200).send(
+      submissions
+    );
+  } catch (err) {
+    next(err);
+  }
+})
+ */
+
+/***
+ * 
+if (req.file && req.body && req.body.userId) {
+  const image = {
+    contentType: req.file.mimetype,
+    filename: req.file.filename,
+    path: req.file.path,
+    userId: req.body.userId
+  }
+
+  // const id = await saveImageInfo(image)
+  const id = await saveImageFile(image)
+  const channel = getChannel()
+  channel.sendToQueue("images", Buffer.from(JSON.stringify({
+    id: id.toString(),
+    filename: req.file.filename
+  })));
+
+  await removeUploadedFile(req.file);
+  res.status(200).send({
+    id: id
+  })
+} else {
+  res.status(400).send({
+    err: "Invalid file type. Please submit file of type JPEG or PNG."
+  })
+}
+ */
 
 module.exports = router

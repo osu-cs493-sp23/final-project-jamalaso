@@ -1,5 +1,6 @@
 const { getDbReference } = require('../lib/mongo')
 const { ObjectId } = require('mongodb');
+const fs = require("node:fs")
 
 
 const AssignmentsSchema = {
@@ -11,6 +12,7 @@ const AssignmentsSchema = {
 
 exports.AssignmentsSchema = AssignmentsSchema;
 
+
 async function getAllAssignments() {
     const db = getDbReference();
     const collection = db.collection('assignments');
@@ -19,6 +21,7 @@ async function getAllAssignments() {
 }
 exports.getAllAssignments = getAllAssignments;
 
+
 async function insertAssignment(assignment) {
     const db = getDbReference();
     const collection = db.collection('assignments');
@@ -26,6 +29,7 @@ async function insertAssignment(assignment) {
     return result.insertedId;
 }
 exports.insertAssignment = insertAssignment;
+
 
 async function getAssignmentById(id) {
     const db = getDbReference();
@@ -76,6 +80,8 @@ async function getSubmissions(assignmentId, page) {
         .limit(pageSize)
         .toArray();
 
+    console.log(" ===submissions: ", submissions)
+
     return {
         submissions: submissions,
         page: page,
@@ -90,6 +96,21 @@ async function getSubmissions(assignmentId, page) {
 exports.getSubmissions = getSubmissions;
 
 
+async function getSubmissionById(id) {
+    const db = getDbReference();
+    const collection = db.collection('submissions');
+    if (!ObjectId.isValid(id)) {
+      return null;
+    } else {
+      const results = await collection
+        .find({ _id: new ObjectId(id) })
+        .toArray();
+      return results[0];
+    }
+}
+exports.getSubmissionById = getSubmissionById;
+
+
 async function addSubmission(submission) {
     const db = getDbReference();
     const collection = db.collection('submissions');
@@ -100,3 +121,39 @@ async function addSubmission(submission) {
 exports.addSubmission = addSubmission;
 
 
+async function saveFileInfo(file) {
+    const db = getDbReference();
+    const collection = db.collection('submissions');
+    const result = await collection.insertOne(file);
+    return result.insertedId;
+}
+exports.saveFileInfo = saveFileInfo
+
+
+function removeUploadedFile(file) {
+    return new Promise((resolve, reject) => {
+        fs.unlink(file.path, (err) => {
+            if (err) {
+                reject(err);
+            } else {
+                resolve();
+            }
+        });
+    });
+}
+exports.removeUploadedFile = removeUploadedFile
+
+
+async function getFileInfoById(id) {
+    const db = getDbReference();
+    const collection = db.collection('submissions');
+    if (!ObjectId.isValid(id)) {
+        return null;
+    } else {
+        const results = await collection
+            .find({ _id: new ObjectId(id) })
+            .toArray();
+        return results[0];
+    }
+}
+exports.getFileInfoById = getFileInfoById
