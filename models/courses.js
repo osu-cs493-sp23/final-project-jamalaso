@@ -99,12 +99,11 @@ async function getAssignmentsByCourse(courseId) {
 exports.getAssignmentsByCourse = getAssignmentsByCourse;
 
 
-/**** HAVE TO CHANGE THIS NOW */
 async function getCourseStudents(courseId) {
   const db = getDbReference();
   const collection = db.collection('students');
 
-  const students = await collection.find({ courseId: courseId }).toArray();;
+  const students = await collection.find({ enrolled: courseId }).toArray();
   return students;
 }
 exports.getCourseStudents = getCourseStudents;
