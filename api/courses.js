@@ -2,15 +2,16 @@ const { Router } = require('express')
 
 const router = Router()
 const { getAllCourses, insertCourse, getCourseById, updateCourse, deleteCourse,
-  getAssignmentsByCourse, getCourseStudents, addEnrolledStudents, getCourseRoster, CourseSchema } = require('../models/courses');
+  getAssignmentsByCourse, getCourseStudents, addEnrolledStudents, getCourseRoster, CourseSchema, removeEnrolledCourse } = require('../models/courses');
 
 const { requireAuthentication } = require("../lib/auth");
 const { validateAgainstSchema } = require('../lib/validation')
-const {getUserByEmail } = require('../models/users');
+const { getUserByEmail } = require('../models/users');
 
 const { ObjectId } = require('mongodb');
+const e = require('express');
 
-
+const fs = require("node:fs")
 
 router.get('/', async function (req, res) {
   try {
@@ -84,7 +85,7 @@ router.patch('/:id', requireAuthentication, async function (req, res, next) {
     try {
       const permissionsRole = await getUserByEmail(req.user.id)
       const courseId = req.params.id;
-      
+
       // Retrieve the existing course
       const existingCourse = await getCourseById(courseId);
       // console.log(" ======permissionsRole:", String(permissionsRole._id))
@@ -99,7 +100,7 @@ router.patch('/:id', requireAuthentication, async function (req, res, next) {
       // console.log("Bool: ", String(permissionsRole._id) === existingCourse.instructorId)
       // console.log("Bool 2: ", !(permissionsRole.role === 'instructor' && String(permissionsRole._id) === existingCourse.instructorId))
       // console.log("Bool 3: ", permissionsRole.role !== 'admin')
-      
+
       // Check authorization
       if (permissionsRole.role !== 'admin' && !(permissionsRole.role === 'instructor' && String(permissionsRole._id) === existingCourse.instructorId)) {
         return res.status(403).json({ error: 'Forbidden: You are not allowed to update this course' });
@@ -187,32 +188,60 @@ router.get('/:id/students', requireAuthentication, async function (req, res, nex
 
 
 router.post('/:id/students', requireAuthentication, async function (req, res, next) {
-  try {
+  if (Object.keys(req.body).some(field => ["add", "remove"].includes(field))) {
+    try {
+      const permissionsRole = await getUserByEmail(req.user.id)
+      const courseId = req.params.id;
+      const enrolledStudents = req.body.students;
 
-    const permissionsRole = await getUserByEmail(req.user.id)
-    const courseId = req.params.id;
-    const enrolledStudents = req.body.students;
+      // Retrieve the existing course
+      const existingCourse = await getCourseById(courseId);
 
-    // Retrieve the existing course
-    const existingCourse = await getCourseById(courseId);
+      // Check if the course exists
+      if (!existingCourse) {
+        return res.status(404).json({ error: 'Course not found' });
+      }
 
-    // Check if the course exists
-    if (!existingCourse) {
-      return res.status(404).json({ error: 'Course not found' });
+      // Check authorization
+      if (permissionsRole.role !== 'admin' && !(permissionsRole.role === 'instructor' && String(permissionsRole._id) === existingCourse.instructorId)) {
+        return res.status(403).json({ error: 'Forbidden: You are not allowed to retrieve information about this course' });
+      }
+
+      const body = req.body;
+
+      if (body.add) {
+        body.add.forEach((value) => {
+          // Call a function for "add" value
+          addEnrolledStudents(courseId, value);
+        });
+      }
+
+      let result;
+      if (body.remove) {
+        for (const value of body.remove) {
+          // Call a function for "remove" value
+          result = await removeEnrolledCourse(courseId, value);
+        };
+      }
+
+      // await addEnrolledStudents(courseId, enrolledStudents);
+
+      if (!result) {
+        res.status(200).json({
+          message: 'Succesfully Enrolled or Unenrolled Student'
+        });
+      } else {
+        res.status(404).json({
+          message: 'Student to be Unenrolled could not be found'
+        });
+      }
+    } catch (err) {
+      next(err);
     }
-
-    // Check authorization
-    if (permissionsRole.role !== 'admin' && !(permissionsRole.role === 'instructor' && String(permissionsRole._id) === existingCourse.instructorId)) {
-      return res.status(403).json({ error: 'Forbidden: You are not allowed to retrieve information about this course' });
-    }
-
-    await addEnrolledStudents(courseId, enrolledStudents);
-
-    res.status(200).json({
-      message: 'Succesfully Enrolled Student'
+  } else {
+    res.status(400).send({
+      err: "Request body does not contain a valid addition or removal of a student's enrollment."
     });
-  } catch (err) {
-    next(err);
   }
 });
 
@@ -223,17 +252,45 @@ router.get('/:id/roster', requireAuthentication, async function (req, res, next)
 
     const permissionsRole = await getUserByEmail(req.user.id)
     const courseId = req.params.id;
-    
+
     if (permissionsRole.role !== 'admin' && !(permissionsRole.role === 'instructor' && String(permissionsRole._id) === existingCourse.instructorId)) {
       return res.status(403).json({ error: 'Forbidden: You are not allowed to retrieve information about this course' });
     }
-    
+
     const roster = await getCourseRoster(courseId);
 
-    res.status(200).json({
-      message: 'Roster',
-      roster: roster
+    const filename = `roster_${courseId}.csv`;
+    const fileStream = fs.createWriteStream(filename);
+
+    // Write the CSV headers
+    fileStream.write('"ID","Name","Email"\n');
+
+    // Write each student's information as a CSV row
+    roster.forEach((student) => {
+      const row = `"${student._id}","${student.name}","${student.email}"\n`;
+      fileStream.write(row);
     });
+
+    // Close the file stream
+    fileStream.end();
+
+    // Read the file contents
+    const fileContents = fs.readFileSync(filename, 'utf8');
+
+    // Set the response headers for file download
+    res.setHeader('Content-Type', 'text/csv');
+    res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
+
+    // Stream the file to the response
+    fs.createReadStream(filename).pipe(res);
+
+    // Send the file contents as the response
+    res.send(fileContents);
+
+    // res.status(200).json({
+    //   message: 'Roster',
+    //   roster: roster
+    // });
   } catch (err) {
     next(err);
   }
@@ -244,15 +301,15 @@ router.get('/:id/roster', requireAuthentication, async function (req, res, next)
 router.get('/:id/assignments', async function (req, res, next) {
   try {
     const courseId = req.params.id;
-    
+
     // Retrieve the existing course
     const existingCourse = await getCourseById(courseId);
-    
+
     // Check if the course exists
     if (!existingCourse) {
       return res.status(404).json({ error: 'Course not found' });
     }
-    
+
     const assignments = await getAssignmentsByCourse(courseId);
     res.status(200).json({
       assignments: assignments

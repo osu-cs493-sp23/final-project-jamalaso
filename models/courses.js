@@ -1,5 +1,6 @@
 const { getDbReference } = require('../lib/mongo')
 const { ObjectId } = require('mongodb');
+const fs = require("node:fs")
 
 
 const CourseSchema = {
@@ -43,6 +44,7 @@ async function getAllCourses(page) {
 }
 exports.getAllCourses = getAllCourses;
 
+
 async function insertCourse(course) {
   const db = getDbReference();
   const collection = db.collection('courses');
@@ -50,6 +52,7 @@ async function insertCourse(course) {
   return result.insertedId;
 }
 exports.insertCourse = insertCourse;
+
 
 async function getCourseById(id) {
   const db = getDbReference();
@@ -85,7 +88,6 @@ async function deleteCourse(courseId) {
 exports.deleteCourse = deleteCourse;
 
 
-
 async function getAssignmentsByCourse(courseId) {
   const db = getDbReference();
   const collection = db.collection('assignments');
@@ -97,6 +99,7 @@ async function getAssignmentsByCourse(courseId) {
 exports.getAssignmentsByCourse = getAssignmentsByCourse;
 
 
+/**** HAVE TO CHANGE THIS NOW */
 async function getCourseStudents(courseId) {
   const db = getDbReference();
   const collection = db.collection('students');
@@ -107,65 +110,85 @@ async function getCourseStudents(courseId) {
 exports.getCourseStudents = getCourseStudents;
 
 
-/******** UPDATE FUNCTION TO ADD ENOLLED STUDENTS TO COURSES INSTEAD OF WITHIN STUDENTS */
-async function addEnrolledStudents(courseId, students) {
+async function addEnrolledStudents(courseId, studentId) {
+  console.log("===studentId:", studentId)
+  console.log("===studentId2:", new ObjectId(studentId))
   const db = getDbReference();
-  const collection = db.collection('students');
+  const students = db.collection('students');
 
-  const existingCourse = await collection.findOne({ courseId: courseId });
+  const existingStudent = await students.findOne({ _id: new ObjectId(studentId) });
 
-  if (existingCourse) {
-    await collection.updateOne(
-      { courseId: courseId },
-      { $addToSet: { enrolled: { $each: students } } }
+  if (existingStudent) {
+    await students.updateOne(
+      { _id: new ObjectId(studentId) },
+      { $addToSet: { enrolled: courseId } }
     );
   } else {
-    await collection.insertOne({
-      courseId: courseId,
-      enrolled: students
+    await students.insertOne({
+      _id: new ObjectId(studentId),
+      enrolled: [courseId]
     });
   }
 }
 exports.addEnrolledStudents = addEnrolledStudents;
 
 
+async function removeEnrolledCourse(courseId, studentId) {
+  console.log("===studentId:", studentId)
+  console.log("===studentId2:", new ObjectId(studentId))
+  const db = getDbReference();
+  const students = db.collection('students');
+
+  const existingStudent = await students.findOne({ _id: new ObjectId(studentId) });
+
+  if (existingStudent) {
+    await students.updateOne(
+      { _id: new ObjectId(studentId) },
+      { $pull: { enrolled: courseId } }
+    );
+    return 0;
+  } else {
+    return 1;
+  }
+}
+exports.removeEnrolledCourse = removeEnrolledCourse;
+
+
 async function getCourseRoster(courseId) {
   const db = getDbReference();
   const studentsCollection = db.collection('students');
   const usersCollection = db.collection('users');
+  
+  // const enrolledStudents = await studentsCollection.find({ courseId: courseId }).project({ _id: 1 }).toArray();
+  const matchingStudents = await studentsCollection
+    .find(
+      { enrolled: { $in: [courseId] } },
+      { _id: 1 } // Projection to include only the _id field
+    )
+    .toArray();
 
-  const enrolledStudents = await studentsCollection.findOne({ courseId: courseId });
+  // Extract the _id field from each matching student
+  const studentIds = matchingStudents.map(student => student._id);
 
-  if (enrolledStudents) {
-    const enrolledUserIds = enrolledStudents.enrolled;
+  const roster = [];
 
-    console.log('Enrolled User IDs:', enrolledUserIds);
-
-    const roster = [];
-
-    for (const userId of enrolledUserIds) {
-      console.log('Processing User ID:', userId);
-
-
-      const newUserId = new ObjectId(String(userId));
-
-      const user = await usersCollection.findOne({ _id: newUserId });
-
-      console.log('Retrieved User:', user);
-
-      if (user) {
-        roster.push(user);
-      }
+  for (const studentId of studentIds) {
+    console.log("==== studentId:", studentId);
+    const user = await usersCollection.findOne(
+      { _id: new ObjectId(studentId) },
+      { projection: { _id: 1, name: 1, email: 1 } }
+    );
+  
+    if (user) {
+      roster.push(user);
     }
-
-    console.log('Final Roster:', roster);
-
-    return roster;
-  } else {
-    return [];
   }
+
+  console.log(" =====roster:", roster)
+  return roster;
 }
 exports.getCourseRoster = getCourseRoster;
+
 
 async function getCoursesByInstructorId(instructorId) {
   const db = getDbReference();
